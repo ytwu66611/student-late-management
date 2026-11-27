@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>學生遲到管理系統</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-indigo-600 text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-indigo-700 p-2.5 rounded-xl shadow-inner">
+                    <i class="fa-solid fa-graduation-cap text-2xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <h1 class="text-xl sm:text-2xl font-bold tracking-tight">學生遲到與留讀管理系統</h1>
+                        <span id="liveClock" class="bg-indigo-800/80 text-indigo-100 font-mono text-xs px-2.5 py-1 rounded-lg border border-indigo-500/30"></span>
+                    </div>
+                    <p class="text-indigo-200 text-xs sm:text-sm">早上 08:00 起算 | 每遲到 6 分鐘留讀 1 分鐘（無條件進位）</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <button onclick="openIosGuide()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-sm font-medium transition shadow-sm flex items-center gap-2">
+                    <i class="fa-brands fa-apple"></i> iOS 安裝教學
+                </button>
+                <button onclick="exportDataJSON()" class="bg-indigo-700 hover:bg-indigo-800 text-white px-3.5 py-2 rounded-xl text-sm font-medium transition shadow-sm flex items-center gap-2">
+                    <i class="fa-solid fa-download"></i> 備份
+                </button>
+                <label class="bg-sky-600 hover:bg-sky-700 text-white px-3.5 py-2 rounded-xl text-sm font-medium transition shadow-sm flex items-center gap-2 cursor-pointer">
+                    <i class="fa-solid fa-upload"></i> 還原
+                    <input type="file" id="importFile" accept=".json" onchange="importDataJSON(event)" class="hidden">
+                </label>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8 flex-grow w-full grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left Column: Input Form & Quick Stats -->
+        <div class="lg:col-span-1 space-y-6">
+            <!-- Record Form Card -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <h2 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-user-clock text-indigo-600"></i> 登記今日遲到
+                </h2>
+                <form id="lateForm" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">選擇學生姓名 / 快速帶出</label>
+                        <select id="studentSelect" onchange="onStudentSelectChange()" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
+                            <option value="" disabled selected>請選擇座號 / 姓名</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">座號輸入</label>
+                            <input type="number" id="seatNoInput" placeholder="輸入座號" min="1" max="50" oninput="onSeatInput(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">登記日期</label>
+                            <input type="date" id="recordDate" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">到校時間 (08:00 開始計算)</label>
+                        <input type="time" id="arrivalTime" required value="08:15" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition font-mono text-lg">
+                    </div>
+                    <div id="previewBox" class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 space-y-2 hidden">
+                        <div class="text-xs font-bold text-indigo-800 uppercase tracking-wider">計算預覽</div>
+                        <div class="flex justify-between text-sm text-indigo-900">
+                            <span>遲到時間：</span>
+                            <span id="previewLateMinutes" class="font-bold">0 分鐘</span>
+                        </div>
+                        <div class="flex justify-between text-sm text-indigo-900">
+                            <span>須留讀時間 (每6分/1分無條件進位)：</span>
+                            <span id="previewDetentionMinutes" class="font-bold text-rose-600">0 分鐘</span>
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 rounded-xl transition shadow-sm hover:shadow flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-plus-circle"></i> 確認送出登記
+                    </button>
+                </form>
+            </div>
+            <div class="bg-gradient-to-br from-slate-800 to-slate-900 text-white rounded-2xl p-6 shadow-sm">
+                <h3 class="font-bold mb-2 flex items-center gap-2 text-indigo-300">
+                    <i class="fa-solid fa-circle-info"></i> 計算規則說明
+                </h3>
+                <ul class="text-sm text-slate-300 space-y-2 list-disc list-inside">
+                    <li>基準時間為早上 <strong class="text-white">08:00</strong>。</li>
+                    <li>每遲到 6 分鐘對應留讀 1 分鐘（<strong>無條件進位</strong>，例如遲到 1 分鐘即留讀 1 分鐘）。</li>
+                    <li>資料自動儲存於瀏覽器，重新整理絕不遺失。</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Right Column: Tables & Tabs -->
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900">班級遲到與留讀總計</h2>
+                        <p class="text-sm text-slate-500">21 位學生累計統計</p>
+                    </div>
+                    <div class="flex bg-slate-100 p-1 rounded-xl text-sm font-medium">
+                        <button onclick="switchTab('summary')" id="tabBtnSummary" class="px-4 py-2 rounded-lg transition bg-white text-indigo-600 shadow-sm">學生累計榜</button>
+                        <button onclick="switchTab('logs')" id="tabBtnLogs" class="px-4 py-2 rounded-lg transition text-slate-600 hover:text-slate-900">歷史紀錄</button>
+                        <button onclick="switchTab('roster')" id="tabBtnRoster" class="px-4 py-2 rounded-lg transition text-slate-600 hover:text-slate-900">學生名單管理</button>
+                    </div>
+                </div>
+                <div id="tabSummary" class="space-y-4">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead><tr class="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50">
+                                <th class="py-3 px-4 rounded-l-lg">座號</th><th class="py-3 px-4">姓名</th><th class="py-3 px-4 text-center">累計遲到次數</th><th class="py-3 px-4 text-right rounded-r-lg">累計須留讀時間</th>
+                            </tr></thead>
+                            <tbody id="summaryTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="tabLogs" class="space-y-4 hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead><tr class="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50">
+                                <th class="py-3 px-4 rounded-l-lg">日期</th><th class="py-3 px-4">座號</th><th class="py-3 px-4">姓名</th><th class="py-3 px-4">到校時間</th><th class="py-3 px-4 text-center">遲到分</th><th class="py-3 px-4 text-center">留讀時間</th><th class="py-3 px-4 text-right rounded-r-lg">操作</th>
+                            </tr></thead>
+                            <tbody id="logsTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="tabRoster" class="space-y-4 hidden">
+                    <div class="flex justify-between items-center mb-2">
+                        <p class="text-sm text-slate-600">管理 21 位學生的座號與姓名對應：</p>
+                        <button onclick="addNewStudentRow()" class="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-user-plus"></i> 新增學生
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto max-h-96">
+                        <table class="w-full text-left border-collapse">
+                            <thead><tr class="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 sticky top-0">
+                                <th class="py-3 px-4 rounded-l-lg w-24">座號</th><th class="py-3 px-4">學生姓名</th><th class="py-3 px-4 text-right rounded-r-lg">操作</th>
+                            </tr></thead>
+                            <tbody id="rosterTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-end pt-2">
+                        <button onclick="saveRosterChanges()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition shadow-sm">儲存名單變更</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center gap-3 text-sm">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i><span id="toastMessage">操作成功</span>
+    </div>
+    <div id="iosModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2"><i class="fa-brands fa-apple text-xl text-indigo-600"></i> 在 iPhone / iPad 上安裝為 App</h3>
+                <button onclick="closeIosGuide()" class="text-slate-400 hover:text-slate-700 transition"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="text-sm text-slate-600 space-y-3">
+                <p>您可以將此管理系統直接釘選到 iPhone 的主畫面，操作起來就像原生 App 一樣流暢，且支援離線與即時儲存！</p>
+                <ol class="list-decimal list-inside space-y-2 font-medium text-slate-700 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <li>使用 Safari 瀏覽器開啟本網頁。</li>
+                    <li>點擊下方工具列的 <span class="inline-flex items-center px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded font-bold"><i class="fa-solid fa-arrow-up-from-bracket mr-1"></i> 分享</span> 按鈕。</li>
+                    <li>向下捲動並點選 <span class="inline-flex items-center px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded font-bold"><i class="fa-solid fa-square-plus mr-1"></i> 加入主畫面</span>。</li>
+                    <li>點擊右上角的「新增」，即可在桌面隨時開啟！</li>
+                </ol>
+            </div>
+            <button onclick="closeIosGuide()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-xl transition shadow-sm">了解，關閉視窗</button>
+        </div>
+    </div>
+
+    <script>
+        const defaultStudents = [
+            { seatNo: 1, name: "張O銓" }, { seatNo: 2, name: "吳O哲" }, { seatNo: 3, name: "吳O祐" },
+            { seatNo: 4, name: "謝O宏" }, { seatNo: 5, name: "吳O澤" }, { seatNo: 6, name: "蘇O堯" },
+            { seatNo: 7, name: "林O航" }, { seatNo: 8, name: "張O勛" }, { seatNo: 9, name: "許O瑄" },
+            { seatNo: 10, name: "許O恩" }, { seatNo: 11, name: "謝O宏" }, { seatNo: 12, name: "陳O佑" },
+            { seatNo: 13, name: "陳O鈞" }, { seatNo: 14, name: "黃O凱" }, { seatNo: 15, name: "葉O辰" },
+            { seatNo: 16, name: "趙O建" }, { seatNo: 17, name: "劉O烽" }, { seatNo: 18, name: "潘O儒" },
+            { seatNo: 19, name: "蔡O儒" }, { seatNo: 20, name: "鄭O凱" }, { seatNo: 21, name: "鄭O徽" }
+        ];
+        let students = [];
+        let records = [];
+
+        window.onload = function() {
+            loadLocalState();
+            const todayStr = new Date().toISOString().split('T')[0];
+            document.getElementById('recordDate').value = todayStr;
+            initStudentSelect();
+            renderSummary();
+            renderLogs();
+            renderRoster();
+            startLiveClock();
+            document.getElementById('arrivalTime').addEventListener('input', updatePreview);
+            document.getElementById('studentSelect').addEventListener('change', updatePreview);
+        };
+
+        function loadLocalState() {
+            try {
+                students = JSON.parse(localStorage.getItem('late_students_v5')) || defaultStudents;
+                records = JSON.parse(localStorage.getItem('late_records_v5')) || [];
+            } catch(e) { students = defaultStudents; records = []; }
+        }
+        function saveLocalState() {
+            localStorage.setItem('late_students_v5', JSON.stringify(students));
+            localStorage.setItem('late_records_v5', JSON.stringify(records));
+        }
+        function startLiveClock() {
+            function updateClock() {
+                const now = new Date();
+                const pad = n => String(n).padStart(2, '0');
+                document.getElementById('liveClock').textContent = `${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+        function initStudentSelect() {
+            const select = document.getElementById('studentSelect');
+            select.innerHTML = '<option value="" disabled selected>請選擇座號 / 姓名</option>';
+            students.sort((a,b) => a.seatNo - b.seatNo);
+            students.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.seatNo;
+                opt.textContent = `${s.seatNo} 號 - ${s.name}`;
+                select.appendChild(opt);
+            });
+        }
+        function onSeatInput(val) {
+            const seatNo = parseInt(val);
+            const select = document.getElementById('studentSelect');
+            if (!isNaN(seatNo)) {
+                const found = students.find(s => s.seatNo === seatNo);
+                select.value = found ? seatNo : '';
+            } else select.value = '';
+            updatePreview();
+        }
+        function onStudentSelectChange() {
+            document.getElementById('seatNoInput').value = document.getElementById('studentSelect').value;
+            updatePreview();
+        }
+        function calculateLate(arrivalTimeStr) {
+            if (!arrivalTimeStr) return { lateMinutes: 0, detentionMinutes: 0 };
+            const [h, m] = arrivalTimeStr.split(':').map(Number);
+            const diffMins = (h * 60 + m) - (8 * 60);
+            if (diffMins <= 0) return { lateMinutes: 0, detentionMinutes: 0 };
+            return { lateMinutes: diffMins, detentionMinutes: Math.ceil(diffMins / 6) };
+        }
+        function updatePreview() {
+            const timeVal = document.getElementById('arrivalTime').value;
+            const seatVal = document.getElementById('studentSelect').value;
+            const previewBox = document.getElementById('previewBox');
+            if (!timeVal || !seatVal) { previewBox.classList.add('hidden'); return; }
+            const calc = calculateLate(timeVal);
+            if (calc.lateMinutes > 0) {
+                document.getElementById('previewLateMinutes').textContent = `${calc.lateMinutes} 分鐘`;
+                document.getElementById('previewDetentionMinutes').textContent = `${calc.detentionMinutes} 分鐘`;
+                previewBox.classList.remove('hidden');
+            } else previewBox.classList.add('hidden');
+        }
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const seatNo = parseInt(document.getElementById('studentSelect').value);
+            const date = document.getElementById('recordDate').value;
+            const arrivalTime = document.getElementById('arrivalTime').value;
+            const student = students.find(s => s.seatNo === seatNo);
+            if (!student) { showToast('請選擇有效的學生', 'error'); return; }
+            const calc = calculateLate(arrivalTime);
+            if (calc.lateMinutes <= 0) { showToast('到校時間早於或等於 08:00，不算遲到！', 'error'); return; }
+            records.push({ id: Date.now().toString(), seatNo: student.seatNo, name: student.name, date, arrivalTime, lateMinutes: calc.lateMinutes, detentionMinutes: calc.detentionMinutes });
+            saveLocalState();
+            renderSummary();
+            renderLogs();
+            showToast(`成功登記 ${student.name} 遲到紀錄！`);
+            document.getElementById('arrivalTime').value = '08:15';
+            document.getElementById('seatNoInput').value = '';
+            document.getElementById('studentSelect').value = '';
+            document.getElementById('previewBox').classList.add('hidden');
+        }
+        function renderSummary() {
+            const tbody = document.getElementById('summaryTableBody');
+            tbody.innerHTML = '';
+            const stats = {};
+            students.forEach(s => { stats[s.seatNo] = { seatNo: s.seatNo, name: s.name, count: 0, totalDetention: 0 }; });
+            records.forEach(r => {
+                if (stats[r.seatNo]) { stats[r.seatNo].count++; stats[r.seatNo].totalDetention += r.detentionMinutes; }
+                else stats[r.seatNo] = { seatNo: r.seatNo, name: r.name, count: 1, totalDetention: r.detentionMinutes };
+            });
+            const statArray = Object.values(stats).sort((a,b) => a.seatNo - b.seatNo);
+            if (statArray.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-slate-400">尚無資料</td></tr>'; return; }
+            statArray.forEach(st => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition';
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-mono font-medium">${st.seatNo}</td>
+                    <td class="py-3 px-4 font-medium">${st.name}</td>
+                    <td class="py-3 px-4 text-center"><span class="px-2.5 py-0.5 rounded-full text-xs font-medium ${st.count>0?'bg-amber-100 text-amber-800':'bg-slate-100 text-slate-600'}">${st.count} 次</span></td>
+                    <td class="py-3 px-4 text-right font-bold ${st.totalDetention>0?'text-rose-600':'text-slate-600'}">${st.totalDetention} 分鐘</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+        function renderLogs() {
+            const tbody = document.getElementById('logsTableBody');
+            tbody.innerHTML = '';
+            const sorted = [...records].reverse();
+            if (sorted.length === 0) { tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-slate-400">尚無歷史紀錄</td></tr>'; return; }
+            sorted.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition';
+                tr.innerHTML = `
+                    <td class="py-3 px-4 text-slate-600 font-mono text-xs">${r.date}</td>
+                    <td class="py-3 px-4 font-mono font-medium">${r.seatNo}</td>
+                    <td class="py-3 px-4 font-medium">${r.name}</td>
+                    <td class="py-3 px-4 font-mono text-indigo-600 font-medium">${r.arrivalTime}</td>
+                    <td class="py-3 px-4 text-center text-slate-600">${r.lateMinutes}分</td>
+                    <td class="py-3 px-4 text-center font-bold text-rose-600">${r.detentionMinutes} 分鐘</td>
+                    <td class="py-3 px-4 text-right"><button onclick="deleteRecord('${r.id}')" class="text-slate-400 hover:text-rose-600 transition p-1"><i class="fa-solid fa-trash-can"></i></button></td>`;
+                tbody.appendChild(tr);
+            });
+        }
+        function renderRoster() {
+            const tbody = document.getElementById('rosterTableBody');
+            tbody.innerHTML = '';
+            students.sort((a,b) => a.seatNo - b.seatNo);
+            students.forEach((s, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition';
+                tr.innerHTML = `
+                    <td class="py-2.5 px-4"><input type="number" value="${s.seatNo}" data-index="${idx}" class="roster-seat w-20 bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 text-sm font-mono outline-none focus:ring-1 focus:ring-indigo-500"></td>
+                    <td class="py-2.5 px-4"><input type="text" value="${s.name}" data-index="${idx}" class="roster-name w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1 text-sm outline-none focus:ring-1 focus:ring-indigo-500"></td>
+                    <td class="py-2.5 px-4 text-right"><button onclick="removeRosterRow(${idx})" class="text-slate-400 hover:text-rose-600 transition p-1.5"><i class="fa-solid fa-trash-can"></i></button></td>`;
+                tbody.appendChild(tr);
+            });
+        }
+        function addNewStudentRow() {
+            const maxSeat = students.length > 0 ? Math.max(...students.map(s => s.seatNo)) + 1 : 1;
+            students.push({ seatNo: maxSeat, name: '新學生' });
+            renderRoster();
+        }
+        function removeRosterRow(idx) { students.splice(idx, 1); renderRoster(); }
+        function saveRosterChanges() {
+            const seatInputs = document.querySelectorAll('.roster-seat');
+            const nameInputs = document.querySelectorAll('.roster-name');
+            const newStudents = [];
+            for (let i = 0; i < seatInputs.length; i++) {
+                newStudents.push({ seatNo: parseInt(seatInputs[i].value) || (i+1), name: nameInputs[i].value.trim() || `學生${i+1}` });
+            }
+            students = newStudents;
+            saveLocalState();
+            initStudentSelect();
+            renderSummary();
+            renderRoster();
+            showToast('學生名單已成功更新！');
+        }
+        function deleteRecord(id) {
+            if (confirm('確定要刪除這筆紀錄嗎？')) {
+                records = records.filter(r => r.id !== id);
+                saveLocalState();
+                renderSummary();
+                renderLogs();
+                showToast('已刪除該筆遲到紀錄');
+            }
+        }
+        function switchTab(tabName) {
+            ['tabSummary', 'tabLogs', 'tabRoster'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            ['tabBtnSummary', 'tabBtnLogs', 'tabBtnRoster'].forEach(id => { document.getElementById(id).className = 'px-4 py-2 rounded-lg transition text-slate-600 hover:text-slate-900'; });
+            document.getElementById('tab' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.remove('hidden');
+            document.getElementById('tabBtn' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).className = 'px-4 py-2 rounded-lg transition bg-white text-indigo-600 shadow-sm';
+            if (tabName === 'roster') renderRoster();
+        }
+        function exportDataJSON() {
+            const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify({ students, records }, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute('href', dataStr);
+            downloadAnchor.setAttribute('download', `student_late_backup_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast('已成功匯出備份檔案！');
+        }
+        function importDataJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (parsed.students) students = parsed.students;
+                    if (parsed.records) records = parsed.records;
+                    saveLocalState();
+                    initStudentSelect();
+                    renderSummary();
+                    renderLogs();
+                    renderRoster();
+                    showToast('備份資料還原成功！');
+                } catch(err) { showToast('檔案格式錯誤，還原失敗', 'error'); }
+            };
+            reader.readAsText(file);
+        }
+        function openIosGuide() { document.getElementById('iosModal').classList.remove('hidden'); }
+        function closeIosGuide() { document.getElementById('iosModal').classList.add('hidden'); }
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = message;
+            document.getElementById('toastIcon').className = type === 'error' ? 'fa-solid fa-triangle-exclamation text-rose-400 text-lg' : 'fa-solid fa-circle-check text-emerald-400 text-lg';
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+        }
+    </script>
+</body>
+</html>
